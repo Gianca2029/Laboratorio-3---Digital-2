@@ -1,0 +1,145 @@
+//Giancarlo Rosa 
+//Digital 2 - Laboratorio 3
+
+
+//Librerías
+
+#include <Arduino.h>
+
+// Prototipo de mis funciones 
+
+void IRAM_ATTR Add();
+void IRAM_ATTR Sub();
+void IRAM_ATTR start_Timer();
+void IRAM_ATTR Timer();
+
+// Variables globales para el primer contador manual 
+
+#define Led1 23
+#define Led2 22
+#define Led3 21
+#define Led4 19
+#define btnA 4
+#define btnS 32
+#define Alarm 2
+#define touch 13
+
+unsigned long estadop_touch = 0;
+const unsigned long rebote_touch = 500;
+
+
+volatile int contador = 0;
+
+// Variables globales para el segundo contador automático 
+
+#define Led5 18
+#define Led6 5
+#define Led7 17
+#define Led8 16
+
+volatile int contador_Auto = 1;
+
+hw_timer_t *Timer_cfg = NULL;
+
+volatile bool indicador = false;
+
+
+// Variable para millis porque ahora rebota otra vez 
+
+volatile unsigned long Add_prev = 0;
+volatile unsigned long Sub_prev = 0;
+const unsigned long debounce_time = 500;
+
+
+// Set up
+
+void setup() {
+
+Serial.begin(115200);
+
+pinMode(Led1, OUTPUT);
+pinMode(Led2, OUTPUT);
+pinMode(Led3, OUTPUT);
+pinMode(Led4, OUTPUT);
+pinMode(Led5, OUTPUT);
+pinMode(Led6, OUTPUT);
+pinMode(Led7, OUTPUT);
+pinMode(Led8, OUTPUT);
+pinMode(btnA, INPUT_PULLUP);
+pinMode(btnS, INPUT_PULLUP);
+
+pinMode(Alarm, OUTPUT);
+digitalWrite(Alarm, LOW);
+
+attachInterrupt(digitalPinToInterrupt(btnA), Add, FALLING);
+attachInterrupt(digitalPinToInterrupt(btnS), Sub, FALLING);
+
+start_Timer();
+
+}
+
+void loop() {
+
+int contador2 = contador;
+
+digitalWrite(Led1, bitRead(contador2, 0));
+digitalWrite(Led2, bitRead(contador2, 1));
+digitalWrite(Led3, bitRead(contador2, 2));
+digitalWrite(Led4, bitRead(contador2, 3));
+
+int Cap_touch = touchRead(touch);
+Serial.println(Cap_touch);
+
+
+if (Cap_touch < 50) {
+  unsigned long currentMillis = millis();
+  if (currentMillis - estadop_touch > rebote_touch) {
+  contador_Auto = 0;
+  estadop_touch = currentMillis;
+  }
+}
+
+}
+
+
+// Funciones ya desarrolladas
+
+void IRAM_ATTR Add() {
+  unsigned long current_millis = millis();
+  if(current_millis - Add_prev > debounce_time){
+  contador++;
+    if (contador > 15) contador = 0;
+    Add_prev = current_millis;
+  }
+}
+
+void IRAM_ATTR Sub() {
+  unsigned long current_millis = millis();
+  if(current_millis - Sub_prev > debounce_time){
+  contador--;
+    if (contador < 0) contador = 15;
+    Sub_prev = current_millis;
+  }
+}
+
+void IRAM_ATTR Timer() {
+  contador_Auto++;
+    if (contador_Auto > 15) contador_Auto = 0;
+    if (contador_Auto == contador) {
+      indicador = !indicador; 
+      digitalWrite(Alarm, indicador ? HIGH : LOW);
+      contador_Auto = 0;   
+    }
+    digitalWrite(Led5, bitRead(contador_Auto, 0));
+    digitalWrite(Led6, bitRead(contador_Auto, 1));
+    digitalWrite(Led7, bitRead(contador_Auto, 2));
+    digitalWrite(Led8, bitRead(contador_Auto, 3));
+  
+}
+
+void IRAM_ATTR start_Timer() {
+  Timer_cfg = timerBegin(0, 80, true); 
+  timerAttachInterrupt(Timer_cfg, &Timer, true);
+  timerAlarmWrite(Timer_cfg, 250000, true); // 250 ms
+  timerAlarmEnable(Timer_cfg);
+}
